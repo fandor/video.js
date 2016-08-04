@@ -1248,10 +1248,6 @@ class Player extends Component {
     return this;
   }
 
-  as3() {
-    this.techCall_('change');
-    return this;
-  }
   /**
    * Check if the player is paused
    * ```js
