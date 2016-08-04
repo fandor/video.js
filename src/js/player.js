@@ -624,6 +624,10 @@ class Player extends Component {
     this.on(this.tech_, 'texttrackchange', this.handleTechTextTrackChange_);
     this.on(this.tech_, 'loadedmetadata', this.updateStyleEl_);
     this.on(this.tech_, 'posterchange', this.handleTechPosterChange_);
+    this.on(this.tech_, 'metrics', this.handleTechMetrics_);
+    this.on(this.tech_, 'levels', this.handleTechLevels_);
+    this.on(this.tech_, 'as3error', this.handleAS3Error_);
+    this.on(this.tech_, 'levelswitch', this.handleTechLevelSwitch_);
 
     this.usingNativeControls(this.techGet_('controls'));
 
@@ -1211,6 +1215,35 @@ class Player extends Component {
   }
 
   /**
+   * Currently Flash tech let's us grab metrics from the video.
+   * Only bandwidth is available right now.
+   *
+   * @private
+   * @method handleTechMetrics_
+   */
+  handleTechMetrics_(vjs, data) {
+    this.trigger('metrics', {'metrics': {'bandwidth':data}});
+  }
+
+  /**
+   * Fires when a manifest file is loaded.
+   *
+   * @private
+   * @method handleTechMetrics_
+   */
+  handleTechLevels_(vjs, data) {
+    this.trigger('levels', {'levels': data});
+  }
+
+  handleAS3Error_(vjs, data) {
+    this.trigger('as3error', {'error': data});
+  }
+
+  handleTechLevelSwitch_(vjs, data) {
+    this.trigger('levelswitch', data);
+  }
+
+  /**
    * Get object for cached values.
    *
    * @return {Object}
@@ -1310,6 +1343,10 @@ class Player extends Component {
     return this;
   }
 
+  as3() {
+    this.techCall_('change');
+    return this;
+  }
   /**
    * Check if the player is paused
    * ```js

@@ -64,6 +64,7 @@ ControlBar.prototype.options_ = {
     'subtitlesButton',
     'captionsButton',
     'audioTrackButton',
+    'QualityControls',
     'fullscreenToggle'
   ]
 };

@@ -276,7 +276,7 @@ class Flash extends Tech {
    */
   buffered() {
     let ranges = this.el_.vjs_getProperty('buffered');
-    if (ranges.length === 0) {
+    if (!ranges.length || ranges.length === 0) {
       return createTimeRange();
     }
     return createTimeRange(ranges[0][0], ranges[0][1]);
@@ -454,9 +454,9 @@ Flash.checkReady = function(tech){
 };
 
 // Trigger events from the swf on the player
-Flash.onEvent = function(swfID, eventName){
+Flash.onEvent = function(swfID, eventName, data) {
   let tech = Dom.getEl(swfID).tech;
-  tech.trigger(eventName);
+  tech.trigger(eventName, data);
 };
 
 // Log errors from the swf
