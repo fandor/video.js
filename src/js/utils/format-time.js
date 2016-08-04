@@ -12,11 +12,11 @@
  * @function formatTime
  */
 function formatTime(seconds, guide=seconds) {
-  let s = Math.floor(seconds % 60);
-  let m = Math.floor(seconds / 60 % 60);
-  let h = Math.floor(seconds / 3600);
-  const gm = Math.floor(guide / 60 % 60);
-  const gh = Math.floor(guide / 3600);
+  let s = Math.round(seconds % 60);
+  let m = Math.round(seconds / 60 % 60);
+  let h = Math.round(seconds / 3600);
+  const gm = Math.round(guide / 60 % 60);
+  const gh = Math.round(guide / 3600);
 
   // handle invalid times
   if (isNaN(seconds) || seconds === Infinity) {

@@ -58,6 +58,7 @@ ControlBar.prototype.options_ = {
     'chaptersButton',
     'subtitlesButton',
     'captionsButton',
+    'QualityControls',
     'fullscreenToggle'
   ]
 };
