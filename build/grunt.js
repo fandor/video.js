@@ -1,3 +1,4 @@
+import {gruntCustomizer, gruntOptionsMaker} from './options-customizer.js';
 module.exports = function(grunt) {
   require('time-grunt')(grunt);
 
@@ -13,9 +14,81 @@ module.exports = function(grunt) {
     patch: verParts[2]
   };
 
+  const browserifyGruntDefaults = {
+    browserifyOptions: {
+      debug: true,
+      standalone: 'videojs'
+    },
+    plugin: [
+      ['browserify-derequire']
+    ],
+    transform: [
+      require('babelify').configure({
+        sourceMapRelative: './',
+        loose: ['all']
+      }),
+      ['browserify-versionify', {
+        placeholder: '__VERSION__',
+        version: pkg.version
+      }],
+      ['browserify-versionify', {
+        placeholder: '__VERSION_NO_PATCH__',
+        version: version.majorMinor
+      }],
+      ['browserify-versionify', {
+        placeholder: '__SWF_VERSION__',
+        version: pkg.dependencies['videojs-swf']
+      }]
+    ]
+  };
+
+  const githubReleaseDefaults = {
+    options: {
+      release: {
+        tag_name: 'v'+ version.full,
+        name: version.full,
+        body: require('chg').find(version.full).changesRaw
+      },
+    },
+    files: {
+      src: [`dist/video-js-${version.full}.zip`] // Files that you want to attach to Release
+    }
+  };
+
+  /**
+   * Customizes _.merge behavior in `browserifyGruntOptions` to concatenate
+   * arrays. This can be overridden on a per-call basis to
+   *
+   * @see https://lodash.com/docs#merge
+   * @function browserifyGruntCustomizer
+   * @private
+   * @param  {Mixed} objectValue
+   * @param  {Mixed} sourceValue
+   * @return {Object}
+   */
+  const browserifyGruntCustomizer = gruntCustomizer;
+
+  /**
+   * Creates a unique object of Browserify Grunt task options.
+   *
+   * @function browserifyGruntOptions
+   * @private
+   * @param  {Object} [options]
+   * @param  {Function} [customizer=browserifyGruntCustomizer]
+   *         If the default array-concatenation behavior is not desireable,
+   *         pass _.noop or a unique customizer (https://lodash.com/docs#merge).
+   *
+   * @return {Object}
+   */
+  const browserifyGruntOptions = gruntOptionsMaker(browserifyGruntDefaults, browserifyGruntCustomizer);
+
+  const githubReleaseCustomizer = gruntCustomizer;
+  const githubReleaseOptions = gruntOptionsMaker(githubReleaseDefaults, githubReleaseCustomizer);
+
   /**
    * Creates processor functions for license banners.
    *
+   * @function createLicenseProcessor
    * @private
    * @param  {Object} data Custom data overriding `bannerCommonData`. Will
    *                       not be mutated.
@@ -23,11 +96,13 @@ module.exports = function(grunt) {
    *                       using an object constructed from `bannerCommonData`
    *                       and the `data` argument.
    */
-  let createLicenseProcessor = (data) => function () {
-    return grunt.template.process(license, {
-      data: _.merge({}, bannerCommonData, data)
-    });
-  };
+  function createLicenseProcessor(data) {
+    return () => {
+      return grunt.template.process(license, {
+        data: _.merge({}, bannerCommonData, data)
+      });
+    };
+  }
 
   version.majorMinor = `${version.major}.${version.minor}`;
   grunt.vjsVersion = version;
@@ -74,9 +149,17 @@ module.exports = function(grunt) {
     },
     dist: {},
     watch: {
+      novtt: {
+        files: ['build/temp/video.js'],
+        tasks: ['concat:novtt']
+      },
+      minify: {
+        files: ['build/temp/video.js'],
+        tasks: ['uglify']
+      },
       skin: {
         files: ['src/css/**/*'],
-        tasks: 'sass'
+        tasks: ['sass']
       },
       jshint: {
         files: ['src/**/*', 'test/unit/**/*.js', 'Gruntfile.js'],
@@ -113,7 +196,7 @@ module.exports = function(grunt) {
       minify: {
         expand: true,
         cwd: 'build/temp/',
-        src: ['video-js.css'],
+        src: ['video-js.css', 'alt/video-js-cdn.css'],
         dest: 'build/temp/',
         ext: '.min.css'
       }
@@ -121,7 +204,8 @@ module.exports = function(grunt) {
     sass: {
       build: {
         files: {
-          'build/temp/video-js.css': 'src/css/video-js.scss'
+          'build/temp/video-js.css': 'src/css/vjs.scss',
+          'build/temp/alt/video-js-cdn.css': 'src/css/vjs-cdn.scss'
         }
       }
     },
@@ -131,7 +215,12 @@ module.exports = function(grunt) {
         configFile: 'test/karma.conf.js'
       },
 
-      defaults: {},
+      defaults: {
+        detectBrowsers: {
+          enabled: !process.env.TRAVIS,
+          usePhantomJS: false
+        }
+      },
 
       watch: {
         autoWatch: true,
@@ -154,9 +243,7 @@ module.exports = function(grunt) {
       ie11_bs:      { browsers: ['ie11_bs'] },
       ie10_bs:      { browsers: ['ie10_bs'] },
       ie9_bs:       { browsers: ['ie9_bs'] },
-      ie8_bs:       { browsers: ['ie8_bs'] },
-      android_bs:   { browsers: ['android_bs'] },
-      ios_bs:       { browsers: ['ios_bs'] }
+      ie8_bs:       { browsers: ['ie8_bs'] }
     },
     vjsdocs: {
       all: {
@@ -227,46 +314,33 @@ module.exports = function(grunt) {
         auth: {
           user: process.env.VJS_GITHUB_USER,
           password: process.env.VJS_GITHUB_TOKEN
-        },
-        release: {
-          tag_name: 'v'+ version.full,
-          name: version.full,
-          body: require('chg').find(version.full).changesRaw
         }
       },
-      files: {
-        src: [`dist/video-js-${version.full}.zip`] // Files that you want to attach to Release
-      }
+      release: githubReleaseOptions(),
+      prerelease: githubReleaseOptions({
+        options: {
+          release: {
+            prerelease: true
+          }
+        }
+      })
     },
     browserify: {
-      options: {
-        browserifyOptions: {
-          debug: true,
-          standalone: 'videojs'
-        },
-        plugin: [
-          ['browserify-derequire']
-        ],
-        transform: [
-          require('babelify').configure({
-            sourceMapRelative: './',
-            loose: ['all']
-          }),
-          ['browserify-versionify', {
-            placeholder: '__VERSION__',
-            version: pkg.version
-          }],
-          ['browserify-versionify', {
-            placeholder: '__VERSION_NO_PATCH__',
-            version: version.majorMinor
-          }],
-          ['browserify-versionify', {
-            placeholder: '__SWF_VERSION__',
-            version: pkg.dependencies['videojs-swf']
-          }]
-        ]
-      },
+      options: browserifyGruntOptions(),
       build: {
+        files: {
+          'build/temp/video.js': ['src/js/video.js']
+        }
+      },
+      dist: {
+        options: browserifyGruntOptions({
+          transform: [
+            ['browserify-versionify', {
+              placeholder: '../node_modules/videojs-vtt.js/dist/vtt.js',
+              version: 'https://cdn.rawgit.com/gkatsev/vtt.js/vjs-v0.12.1/dist/vtt.min.js'
+            }],
+          ]
+        }),
         files: {
           'build/temp/video.js': ['src/js/video.js']
         }
@@ -331,7 +405,7 @@ module.exports = function(grunt) {
         options: {
           separator: '\n',
         },
-        src: ['build/temp/video.js', 'node_modules/vtt.js/dist/vtt.js'],
+        src: ['build/temp/video.js', 'node_modules/videojs-vtt.js/dist/vtt.js'],
         dest: 'build/temp/video.js',
       },
     },
@@ -376,8 +450,9 @@ module.exports = function(grunt) {
   require('load-grunt-tasks')(grunt);
   grunt.loadNpmTasks('videojs-doc-generator');
   grunt.loadNpmTasks('chg');
+  grunt.loadNpmTasks('gkatsev-grunt-sass');
 
-  grunt.registerTask('build', [
+  const buildDependents = [
     'clean:build',
 
     'jshint',
@@ -397,20 +472,30 @@ module.exports = function(grunt) {
     'copy:swf',
     'copy:ie8',
     'vjslanguages'
-  ]);
+  ];
+
+  grunt.registerTask('build', buildDependents);
+
+  grunt.registerTask(
+    'build:dist',
+    buildDependents.map(task => task === 'browserify:build' ? 'browserify:dist' : task)
+  );
 
   grunt.registerTask('dist', [
     'clean:dist',
-    'build',
+    'build:dist',
     'copy:dist',
     'copy:examples',
     'zip:dist'
   ]);
 
+  grunt.registerTask('skin', ['sass']);
+
   // Default task - build and test
   grunt.registerTask('default', ['test']);
 
-  grunt.registerTask('test', ['build', 'karma:defaults']);
+  // The test script includes coveralls only when the TRAVIS env var is set.
+  grunt.registerTask('test', ['build', 'karma:defaults'].concat(process.env.TRAVIS && 'coveralls').filter(Boolean));
 
   // Run while developing
   grunt.registerTask('dev', ['build', 'connect:dev', 'concurrent:watchSandbox']);
