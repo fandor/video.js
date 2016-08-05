@@ -75,37 +75,49 @@ class ChaptersButton extends TextTrackButton {
   createMenu() {
     let tracks = this.player_.textTracks() || [];
     let chaptersTrack;
-    let items = this.items = [];
+    let items = this.items || [];
 
-    for (let i = 0, l = tracks.length; i < l; i++) {
+    for (let i = tracks.length - 1; i >= 0; i--) {
+
+      // We will always choose the last track as our chaptersTrack
       let track = tracks[i];
+
       if (track['kind'] === this.kind_) {
-        if (!track.cues) {
-          track['mode'] = 'hidden';
-          /* jshint loopfunc:true */
-          // TODO see if we can figure out a better way of doing this https://github.com/videojs/video.js/issues/1864
-          window.setTimeout(Fn.bind(this, function() {
-            this.createMenu();
-          }), 100);
-          /* jshint loopfunc:false */
-        } else {
-          chaptersTrack = track;
-          break;
-        }
+        chaptersTrack = track;
+
+        break;
       }
     }
 
     let menu = this.menu;
     if (menu === undefined) {
       menu = new Menu(this.player_);
-      menu.contentEl().appendChild(Dom.createEl('li', {
+      let title = Dom.createEl('li', {
         className: 'vjs-menu-title',
         innerHTML: toTitleCase(this.kind_),
         tabIndex: -1
-      }));
+      });
+      menu.children_.unshift(title);
+      Dom.insertElFirst(title, menu.contentEl());
+    } else {
+        // We will empty out the menu children each time because we want a 
+        // fresh new menu child list each time
+        items.forEach(item => menu.removeChild(item));
+        // Empty out the ChaptersButton menu items because we no longer need them
+        items = [];
     }
 
-    if (chaptersTrack) {
+    if (chaptersTrack && chaptersTrack.cues == null) {
+      chaptersTrack['mode'] = 'hidden';
+
+      let remoteTextTrackEl = this.player_.remoteTextTrackEls().getTrackElementByTrack_(chaptersTrack);
+
+      if (remoteTextTrackEl) {
+        remoteTextTrackEl.addEventListener('load', (event) => this.update());
+      }
+    }
+
+    if (chaptersTrack && chaptersTrack.cues && chaptersTrack.cues.length > 0) {
       let cues = chaptersTrack['cues'], cue;
 
       for (let i = 0, l = cues.length; i < l; i++) {
@@ -120,16 +132,15 @@ class ChaptersButton extends TextTrackButton {
 
         menu.addChild(mi);
       }
-      this.addChild(menu);
     }
 
-    if (this.items.length > 0) {
+    if (items.length > 0) {
       this.show();
     }
-
+    // Assigning the value of items back to this.items for next iteration
+    this.items = items;
     return menu;
   }
-
 }
 
 ChaptersButton.prototype.kind_ = 'chapters';
